@@ -14,18 +14,13 @@ class Model:
         self.input_dim = input_dim
 
         # Construct the model nodes with one activity map for each feature (preference)
-        self.preprocessing_stage = [[[InputProcessor(x=x, y=y, feature_pref=feature) for y in range(input_dim)]
-                                     for x in range(input_dim)]
-                                    for feature in features]
+        self.preprocessing_stage = [InputProcessor(feature_pref=feature, input_dim=input_dim) for feature in features]
 
         print(self.preprocessing_stage)
 
     def update(self, _input: np.ndarray, timestep: float):
         for f in range(len(self.features)):
-            for x in range(self.input_dim):
-                for y in range(self.input_dim):
-                    self.preprocessing_stage[f][x][y].update(_input[x][y], timestep)
-
+            self.preprocessing_stage[f].update(_input, timestep)
 
     def __repr__(self):
         return self.preprocessing_stage.__repr__()
@@ -33,12 +28,7 @@ class Model:
     def __str__(self):
         rtn_string = f"Preprocessing Stage: \n"
         for f in range(len(self.features)):
-            rtn_string += "["
-            for x in range(self.input_dim):
-                if x != 0:
-                    rtn_string += f"\n"
-                rtn_string += f"{self.preprocessing_stage[f][x]}"
-            rtn_string += "],\n"
+            rtn_string += f"Feature {self.features[f]}: \n{self.preprocessing_stage[f]}\n"
         return rtn_string
 
 

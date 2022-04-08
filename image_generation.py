@@ -1,8 +1,4 @@
 import numpy as np
-from typing import Tuple
-
-# np.set_printoptions(threshold=np.inf)
-
 
 def generate_block(bg_dim: int = 121,
                    figure_dim: int = 25,

@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class InputProcessor:
     """
     Class Representing one unit (with some feature preference) of a node in the input preprocessor stage of the model
@@ -7,43 +10,34 @@ class InputProcessor:
     V represents faster excitatory cells
     W represents slower inhibitory cells
     """
-    def __init__(self, feature_pref: int, x: int, y: int):
+    def __init__(self, feature_pref: int, input_dim: int):
         self.feature_pref = feature_pref
-        self.x = x
-        self.y = y
-        self.v = 0.0
-        self.w = 0.0
+        self.V = np.zeros(shape=(input_dim, input_dim))
+        self.W = np.zeros(shape=(input_dim, input_dim))
 
-    def v_dot(self, activity: float) -> float:
-        excitatory = activity * (10 - self.v)
-        inhibitory = 2 * self.w ** 2 * self.v
+    def V_dot(self, signal: np.ndarray) -> np.ndarray:
+        # element = 1 if feature is preferred by this map
+        activity = np.ones_like(signal) * (signal == self.feature_pref)
+
+        excitatory = activity * (10 - self.V)
+        inhibitory = 2 * self.W ** 2 * self.V
         v_dot = excitatory - inhibitory
         return v_dot
 
-    def w_dot(self) -> float:
-        excitatory = self.v * (25 - self.w)
-        inhibitory = self.w
+    def W_dot(self) -> np.ndarray:
+        excitatory = self.V * (25 - self.W)
+        inhibitory = self.W
         return (excitatory - inhibitory) / 5
 
-    def update(self, _input: int, timestep: float) -> None:
-        if _input == self.feature_pref:
-            activity = 1
-        else:
-            activity = 0
+    def update(self, _input: np.ndarray, timestep: float) -> None:
+        V_dot = self.V_dot(_input)
+        W_dot = self.W_dot()
 
-        v_dot = self.v_dot(activity)
-        w_dot = self.w_dot()
-
-        self.v += v_dot * timestep
-        self.w += w_dot * timestep
-
-        if self.v < 0:
-            self.v = 0
-        if self.w < 0:
-            self.w = 0
+        self.V += V_dot * timestep
+        self.W += W_dot * timestep
 
     def __str__(self):
         return self.__repr__()
 
     def __repr__(self):
-        return f"({self.v}, {self.w})"
+        return f"V:\n{self.V}, \n W:\n{self.W}\n"
