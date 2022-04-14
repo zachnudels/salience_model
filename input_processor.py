@@ -3,7 +3,7 @@ import numpy as np
 
 class InputProcessor:
     """
-    Class Representing one unit (with some feature preference) of a node in the input preprocessor stage of the model
+    Class Representing one map (with some feature preference) in the input preprocessor stage of the model
     This stage is attempting to model the dynamics of the path from the LGN to cortex which ``consists of a strong
     transient when the stimulus appears, and this transient is followed by a weaker sustained response.''
     The dynamics are represented in the update_v and update_w equations
@@ -16,8 +16,7 @@ class InputProcessor:
         self.W = np.zeros(shape=(input_dim, input_dim))
 
     def V_dot(self, signal: np.ndarray) -> np.ndarray:
-        # element = 1 if feature is preferred by this map
-        activity = np.ones_like(signal) * (signal == self.feature_pref)
+        activity = np.ones_like(signal) * (signal == self.feature_pref)  # 1 if feature is preferred by this map
 
         excitatory = activity * (10 - self.V)
         inhibitory = 2 * self.W ** 2 * self.V

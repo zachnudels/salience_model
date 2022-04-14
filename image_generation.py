@@ -14,7 +14,6 @@ def generate_block(bg_dim: int = 121,
                 row.append(figure_orientation)
             else:
                 row.append(bg_orientation)
-        print(row)
         image.append(row)
     return np.array(image)
 
