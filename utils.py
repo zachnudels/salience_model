@@ -1,78 +1,74 @@
-import math
-
 import numpy as np
 
-from scipy import ndimage
-from functools import partial
 
-
-def runge_kutta2_step(f, x, y, h):
-    k1 = h * f(x, y)
-    k2 = h * f(x + k1, y + h)
+def runge_kutta2_step(f, x, t, h):
+    k1 = h * f(x, t)
+    k2 = h * f(x + k1, t + h)
 
     # Update next value of y
     return x + (k1 + k2) / 2
 
 
 def extract_window(activity_map: np.ndarray, x: int, y: int, support: int):
+    if x >= activity_map.shape[0]:
+        raise IndexError(f"Cannot index x={x} in array of shape {activity_map.shape}")
+    if y >= activity_map.shape[1]:
+        raise IndexError(f"Cannot index y={y} in array of shape {activity_map.shape}")
     support = support // 2
-
-    # add columns (or rows) if on the edge
-    if x < support:
-        x = support
-        activity_map = np.concatenate((np.repeat(activity_map[:, 0][:, np.newaxis], support - x, axis=1), activity_map),
+    # add columns (or rows) if too near the edge
+    if y < support:
+        activity_map = np.concatenate((np.repeat(activity_map[:, 0][:, np.newaxis], support - y, axis=1), activity_map),
                                       axis=1)
+        y = support
 
-    elif x > activity_map.shape[0] - support:
-        x = activity_map.shape[0] - support
+    elif y >= activity_map.shape[1] - support:
         activity_map = np.concatenate(
-            (activity_map, np.repeat(activity_map[:, -1][:, np.newaxis], activity_map.shape[0] - support + x, axis=1)),
+            (activity_map,
+             np.repeat(activity_map[:, -1][:, np.newaxis], y + support - activity_map.shape[1] + 1, axis=1)),
             axis=1)
 
-    if y < support:
-        y = support
-        activity_map = np.concatenate((np.repeat(activity_map[0, :][np.newaxis, :], support - y, axis=0), activity_map),
+    if x < support:
+        activity_map = np.concatenate((np.repeat(activity_map[0, :][np.newaxis, :], support - x, axis=0), activity_map),
                                       axis=0)
+        x = support
 
-    elif y > activity_map.shape[1] - support:
-        y = activity_map.shape[1] - support
+    elif x >= activity_map.shape[0] - support:
         activity_map = np.concatenate(
-            (activity_map, np.repeat(activity_map[-1, :][np.newaxis, :], activity_map.shape[0] - support + y, axis=0)),
+            (activity_map,
+             np.repeat(activity_map[-1, :][np.newaxis, :], x + support - activity_map.shape[0] + 1, axis=0)),
             axis=0)
 
     window = activity_map[x - support: x + support + 1, y - support: y + support + 1]
     return window
 
 
-def receptive_field_activity(x: int, y: int, support: float, sigma: float, activity_map: np.ndarray):
-    window = extract_window(activity_map, x, y, int(support))
-    return ndimage.gaussian_filter(window, sigma)[support // 2, support // 2]
+def gaussian_1d(x: np.ndarray, mu: float, sigma: float, normalize: bool = False):
+    hg = np.exp(-(x - mu ** 2) / (2 * sigma ** 2))
+    if normalize:
+        return hg / np.sum(hg)
+    else:
+        return hg
 
 
-def feedforward_signal(lower_activity_map: np.ndarray,
-                       support: float,
-                       sigma: float,
-                       X: np.ndarray,
-                       Y: np.ndarray) -> np.ndarray:
-    vectorized_rf_activity = np.vectorize(
-        partial(receptive_field_activity, activity_map=lower_activity_map, support=int(support), sigma=sigma))
-
-    return vectorized_rf_activity(X, Y)
+def gaussian_2d(x: np.ndarray, y: np.ndarray, sigma: float):
+    hg = np.exp(-(x ** 2 + y ** 2) / (2 * sigma ** 2))
+    return hg / np.sum(hg)
 
 
-def feedback_signal(higher_activity_map: np.ndarray,
-                    input_dim_h: int,
-                    input_dim_l: int,
-                    support: float,
-                    sigma: float,
-                    X: np.ndarray,
-                    Y: np.ndarray) -> np.ndarray:
-    vectorized_rf_activity = np.vectorize(
-        partial(receptive_field_activity, activity_map=higher_activity_map, support=int(support), sigma=sigma))
-    rfs = vectorized_rf_activity(X, Y)
+def gaussian_kernel(support: int, sigma: float):
+    space_1D = np.linspace(-(support//2), support//2, support)
+    X, Y = np.meshgrid(space_1D, space_1D)
+    return gaussian_2d(X, Y, sigma=sigma)
 
-    repeats = math.ceil(input_dim_l / input_dim_h)
-    rfs = np.repeat(rfs, repeats, axis=0)
-    rfs = np.repeat(rfs, repeats, axis=1)
 
-    return rfs
+def receptive_field_activity(x: int, y: int, kernel: np.ndarray, activity_map: np.ndarray):
+    """
+    Utility function to find the RF of a cell given the activity of the surrounding cells modelled as a Gaussian filter
+    :param x:
+    :param y:
+    :param kernel:
+    :param activity_map:
+    :return: Activity of cell after application of filter
+    """
+    window = extract_window(activity_map, x, y, kernel.shape[0])
+    return np.sum(window * kernel)
