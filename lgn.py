@@ -1,5 +1,6 @@
 import numpy as np
-
+import pandas as pd
+from utils import runge_kutta2_step, gaussian_1d
 
 class LGN:
     """
@@ -11,42 +12,52 @@ class LGN:
     W represents slower inhibitory cells
     """
 
-    def __init__(self, feature_pref: float, input_dim: int):
+    def __init__(self, parameters: pd.Series, feature_pref: float, input_dim: int):
         self.feature_pref = feature_pref
-        self.V = np.zeros(shape=(input_dim, input_dim))
-        self.W = np.zeros(shape=(input_dim, input_dim))
+        self.V = np.zeros(shape=(input_dim, input_dim), dtype=np.double)
+        self.W = np.zeros(shape=(input_dim, input_dim), dtype=np.double)
+        self.rf_width = parameters["rf_width"]
 
-    def V_dot(self, signal: np.ndarray) -> np.ndarray:
-        # # If feature matches preferences, 1
-        # # If orthogonal, 0
-        # # If close, should be close to 1
-        # # TODO: Make preference circular
-        # activity = np.ones_like(signal) * (1 - np.abs(signal-self.feature_pref))
+    def V_dot(self, V: np.ndarray, signal: np.ndarray) -> np.ndarray:
+        """
+        reaLGNExc.f = @(V,opt) ...
+        - 2*opt.W.^2.*V ...
+        - opt.Gin.*(V - 10);
 
+        areaLGNExc.W = areaLGNInh.V;
+        areaLGNExc = updateNeuronField(areaLGNExc);
+        :param V:
+        :param signal:
+        :return:
+        """
         activity = np.ones_like(signal) * (signal == self.feature_pref)  # 1 if feature is preferred by this map
-        excitatory = activity * (10 - self.V)
-        inhibitory = 2 * self.W ** 2 * self.V
-        v_dot = excitatory - inhibitory
+
+        inhibitory = -2 * self.W ** 2 * V
+        excitatory = -activity * (V - 10)
+        v_dot = inhibitory + excitatory
         return v_dot
 
-    def W_dot(self) -> np.ndarray:
-        excitatory = self.V * (25 - self.W)
-        inhibitory = self.W
-        divisor = 1 / 5
-        return (excitatory - inhibitory) * divisor
+    def W_dot(self, W: np.ndarray, _input=None) -> np.ndarray:
+        """
+        - 1/5*V ...
+        - 1/5*opt.Gin.*(V - 25);
+        :return:
+        """
+        inhibitory = - (1/5) * W
+        excitatory = - (1/5) * self.V * (W - 25)
+        return inhibitory + excitatory
 
     def update(self, _input: np.ndarray, timestep: float) -> None:
         """
         First update excitatory (V) cell using the previous inhibitory (W) cell
         Then update the inhibitory cell (W) using the new V cell
-        areaLGNExc.W = areaLGNInh.V; areaLGNExc = updateNeuronField(areaLGNExc);
-        areaLGNInh.Gin = areaLGNExc.V; areaLGNInh = updateNeuronField(areaLGNInh);
+        areaLGNExc.W = areaLGNInh.V;
+        areaLGNExc = updateNeuronField(areaLGNExc);
+        areaLGNInh.Gin = areaLGNExc.V;
+        areaLGNInh = updateNeuronField(areaLGNInh);
         """
-        V_dot = self.V_dot(_input)
-        self.V += V_dot * timestep
-
-        W_dot = self.W_dot()
-        self.W += W_dot * timestep
+        self.V = runge_kutta2_step(self.V_dot, _input, timestep, self.V)
+        self.W = runge_kutta2_step(self.W_dot, _input, timestep, self.W)
 
     def __str__(self):
         return self.__repr__()
