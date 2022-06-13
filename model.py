@@ -22,7 +22,7 @@ class Model:
                  features: List[int],
                  similarity_width: float,
                  input_dim: int = 121,
-                 lSquare: int = 25):
+                 lSquare: int = 25):  # TODO: Change code so can set where cen, bck, etc. lies
         # PARAMETERS
 
         ratioV1toV2 = 0.5
