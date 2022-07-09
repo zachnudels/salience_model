@@ -40,7 +40,7 @@ def extract_window(activity_map: np.ndarray, x: int, y: int, support: int):
     return window
 
 
-def gaussian_1d(x: Union[int, np.ndarray], mu: float, sigma: float, normalize: bool = False):
+def gaussian_1d(x: Union[int, float, np.ndarray], mu: float, sigma: float, normalize: bool = False):
     hg = np.exp(-((x-mu) ** 2) / (2 * sigma ** 2))
     if normalize:
         return hg / np.sum(hg)
