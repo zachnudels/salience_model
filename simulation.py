@@ -5,8 +5,7 @@ from image_generation import generate_2_blocks
 from model import Model
 
 
-def run(orientations):
-    parm_df = pd.read_csv("../parameters.csv", index_col=0)
+def run(orientations, parm_df):
     stimuli = {"vheus_exp_2": {"V4": {"bg": (8, 10, 10, 12), "cen1": (2, 4, 4, 6), "cen2": (15, 17, 17, 19)},
                                "V1": {"bg": (80, 96, 64, 80), "cen1": (15, 29, 33, 45), "cen2": (121, 135, 138, 150)}},
                "vheus_exp_1": {"FEF": {"bg": (1, 3, 1, 3), "cen1": (8, 10, 8, 10), "cen2": (13, 15, 13, 15)},
