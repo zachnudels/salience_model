@@ -6,8 +6,8 @@ from typing import List, Tuple
 from scipy import interpolate, ndimage
 
 from lgn import LGN
+from fef import FEF
 from region import Region
-from utils import gaussian_1d
 
 
 class Model:
@@ -20,8 +20,7 @@ class Model:
     def __init__(self,
                  parameters: pd.DataFrame,
                  features: List[int],
-                 similarity_width: float,
-                 input_dim: Tuple[int] = (121, 121),
+                 input_dim: Tuple[int, int] = (121, 121),
                  lSquare: int = 25):  # TODO: Change code so can set where cen, bck, etc. lies
         # PARAMETERS
 
@@ -37,18 +36,16 @@ class Model:
         V2_dim = tuple(math.ceil(V1_dim_i * ratioV1toV2) for V1_dim_i in V1_dim)
         V4_dim = tuple(math.floor(V2_dim_i * ratioV2toV4) for V2_dim_i in V2_dim)
 
-        similarity = 1-gaussian_1d(features[1] - features[0], 0, similarity_width)
-
         # Construct the model nodes with one activity map for each feature (preference)
-        self.LGN = [LGN(parameters["LGN"], feature, self.input_dim,) for feature in features]
+        self.LGN = [LGN(feature, self.input_dim,) for feature in features]
         self.V1 = [Region(parameters["V1"], V1_dim, lSquare, V1_dim, feature) for feature in features]
         self.V2 = [Region(parameters["V2"], V2_dim, lSquare, V1_dim, feature) for feature in features]
         self.V4 = [Region(parameters["V4"], V4_dim, lSquare, V1_dim, feature) for feature in features]
+        self.FEF = [FEF(parameters["FEF"], feature, V4_dim) for feature in features]
 
         # Instantiate spaces to reduce signal fidelity when feeding forward
         # This is required since a higher region is more coarsely grained, and so we sample the lower region
         # more coarsely corresponding to the ratio between the dimensions of the two regions
-
         self.V1_X, self.V1_Y = np.linspace(-1, 1, V1_dim[1]), np.linspace(-1, 1, V1_dim[0])
         self.V2_X, self.V2_Y = np.linspace(-1, 1, V2_dim[1]), np.linspace(-1, 1, V2_dim[0])
         self.V4_X, self.V4_Y = np.linspace(-1, 1, V4_dim[1]), np.linspace(-1, 1, V4_dim[0])
@@ -84,6 +81,9 @@ class Model:
                                                 self.V4_X,
                                                 self.V4_Y)
             self.V4[f].update(V4_feedforward, timestep)
+
+            FEF_feedforward = self.V4[f].V
+            self.FEF[f].update(FEF_feedforward, timestep)
 
             V1_2_feedback = feedback_signal(self.V2[f].W,
                                             self.V1[f].fb_kernel,

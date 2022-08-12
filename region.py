@@ -84,24 +84,19 @@ class Region:
         :param feedforward_signal:
         :return:
         """
-        leak_conductance = (- self.g1 * self.U - self.k2 * self.S) * V  # - 45*opt.U.*(V + 0) ...
-        # leak_conductance +=  * V
-        driving_input = -self.a * feedforward_signal  # - 5*opt.Gin.
+        leak_conductance = (- self.g1 * self.U - self.k2 * self.S) * V
+        driving_input = -self.a * feedforward_signal
 
         # There is no effect of D cell in V4 so do not compute for that case
         modulation = 1
         if not pd.isna(self.k1):
             modulation += self.k1 * self.D
-            # modulated_driving_input = driving_input * (1 + self.k * self.D) * (V - self.e1)  # *(1 + 2*D).*(V - 5) ...
-        # else:
 
-        modulated_driving_input = driving_input * modulation * (V - self.e1)  # *(V - 5)
-        boundary_detection = -self.g2 * self.W * (V - self.e2)  # - 1*opt.W.*(V - 2)
-        # modulated_driving_input = -self.g8 * self.S *
+        modulated_driving_input = driving_input * modulation * (V - self.e1)
+        boundary_detection = -self.g2 * self.W * (V - self.e2)
 
         V_dot = leak_conductance + modulated_driving_input + boundary_detection
-        # divisor = 1 / self.c1
-        return V_dot  # * divisor
+        return V_dot
 
     def W_dot(self, W: np.ndarray, _input) -> np.ndarray:
         """
@@ -115,9 +110,9 @@ class Region:
         """
         leak_conductance = 0 - self.g8 * self.S
         if not pd.isna(self.k1):
-            leak_conductance += -self.g3 * self.D  # - 2*opt.Ifb.*V
+            leak_conductance += -self.g3 * self.D
         else:
-            leak_conductance += -self.g3  # - 1/5*V
+            leak_conductance += -self.g3
         leak_conductance *= W
         excitation = -self.g4 * ndimage.correlate(
             abs(_input - ndimage.correlate(_input, self.minus_kernel, mode='nearest')),
@@ -147,7 +142,7 @@ class Region:
 
     def S_dot(self, S: np.ndarray, neighbouring_signals: Dict[float, np.ndarray]) -> np.ndarray:
         leak_conductance = - (1 / self.c5) * S
-        similarity = self.g9 * np.sum([gaussian_1d(self.feature_pref - feature_i, 0.0, 27) *
+        similarity = self.g9 * np.sum([gaussian_1d(np.abs(self.feature_pref - feature_i), 0.0, 27) *
                                        self.V * neighbouring_signals[feature_i]
                                        for feature_i in neighbouring_signals.keys()
                                        if np.sum(self.V * neighbouring_signals[feature_i]) > 0],
@@ -159,17 +154,6 @@ class Region:
                feedforward_signal: np.ndarray,
                timestep: float) -> None:
         """
-        areaV1FF.Gin = areaLGNExc.V; feedforward signal
-        areaV1FF.U = areaV1Inh.V;
-        areaV1FF.W = areaV1Bd.V;
-        areaV1FF.Ifb = areaV1FB.V;
-        areaV1FF = updateNeuronField(areaV1FF);
-        areaV1Bd.Ifb = areaV1FB.V;
-        areaV1Bd.Gin = areaV1FF.V;
-        areaV1Bd = updateNeuronField(areaV1Bd);
-        areaV1Inh.Ifb = areaV1FB.V;
-        areaV1Inh.Gin = areaV1FF.V;
-        areaV1Inh = updateNeuronField(areaV1Inh);
         """
         self.V = runge_kutta2_step(self.V_dot, feedforward_signal, timestep, self.V)
 

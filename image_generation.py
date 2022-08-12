@@ -2,9 +2,9 @@ import numpy as np
 from typing import Tuple, Optional, List
 
 
-def generate_block(input_dim: Tuple[int] = (121, 121),
-                   figure_dim: Tuple[int] = (25, 25),
-                   midpoint: Optional[Tuple[int]] = None,
+def generate_block(input_dim: Tuple[int, int] = (121, 121),
+                   figure_dim: Tuple[int, int] = (25, 25),
+                   midpoint: Optional[Tuple[int, int]] = None,
                    figure_orientation: float = 1,
                    bg_orientation: float = 0) -> np.ndarray:
     image = np.full(input_dim, bg_orientation)
@@ -21,11 +21,11 @@ def generate_block(input_dim: Tuple[int] = (121, 121),
     return image
 
 
-def generate_2_blocks(input_dim: Tuple[int] = (121, 121),
-                      figure_dim: Tuple[int] = (25, 25),
+def generate_2_blocks(input_dim: Tuple[int, int] = (121, 121),
+                      figure_dim: Tuple[int, int] = (25, 25),
                       figure_orientations: List[float] = None,
                       bg_orientation: float = 0,
-                      midpoints: List[Tuple[int]] = None) -> np.ndarray:
+                      midpoints: List[Tuple[int, int]] = None) -> np.ndarray:
     image = np.full((input_dim[1], input_dim[0]), bg_orientation)
     fig_x = int(figure_dim[1]/2)
     fig_y = int(figure_dim[0]/2)

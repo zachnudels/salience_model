@@ -1,7 +1,8 @@
 import numpy as np
-import pandas as pd
-from utils import runge_kutta2_step, gaussian_1d
 from typing import Tuple
+
+from utils import runge_kutta2_step
+
 
 class LGN:
     """
@@ -13,11 +14,10 @@ class LGN:
     W represents slower inhibitory cells
     """
 
-    def __init__(self, parameters: pd.Series, feature_pref: float, input_dim: Tuple[int, int]):
+    def __init__(self, feature_pref: float, input_dim: Tuple[int, int]):
         self.feature_pref = feature_pref
         self.V = np.zeros(shape=input_dim, dtype=np.double)
         self.W = np.zeros(shape=input_dim, dtype=np.double)
-        self.rf_width = parameters["rf_width"]
 
     def V_dot(self, V: np.ndarray, signal: np.ndarray) -> np.ndarray:
         """
