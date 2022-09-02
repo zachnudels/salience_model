@@ -85,27 +85,25 @@ class Model:
             FEF_feedforward = self.V4[f].V
             self.FEF[f].update(FEF_feedforward, timestep)
 
-            V1_2_feedback = feedback_signal(self.V2[f].W,
-                                            self.V1[f].fb_kernel,
+            V1_2_feedback = feedback_interp(self.V2[f].W,
                                             self.V1_X,
                                             self.V1_Y,
                                             self.V2_X,
                                             self.V2_Y)
-            V1_4_feedback = feedback_signal(self.V4[f].W,
-                                            self.V1[f].fb_kernel,
+            V1_4_feedback = feedback_interp(self.V4[f].W,
                                             self.V1_X,
                                             self.V1_Y,
                                             self.V4_X,
                                             self.V4_Y)
-            V1_feedback = V1_2_feedback + V1_4_feedback
+            V1_feedback = ndimage.correlate(V1_2_feedback + V1_4_feedback, self.V1[f].fb_kernel, mode='nearest')
             self.V1[f].update_D(V1_feedback, timestep)
 
-            V2_feedback = feedback_signal(self.V4[f].W,
-                                          self.V2[f].fb_kernel,
+            V2_feedback = feedback_interp(self.V4[f].W,
                                           self.V2_X,
                                           self.V2_Y,
                                           self.V4_X,
                                           self.V4_Y)
+            V2_feedback = ndimage.correlate(V2_feedback, self.V2[f].fb_kernel, mode='nearest')
             self.V2[f].update_D(V2_feedback, timestep)
 
     def __repr__(self):
@@ -134,8 +132,7 @@ def feedforward_signal(lower_activity_map: np.ndarray,
     return f(higher_X, higher_Y)
 
 
-def feedback_signal(higher_activity_map: np.ndarray,
-                    kernel: np.ndarray,
+def feedback_interp(higher_activity_map: np.ndarray,
                     lower_X: np.ndarray,
                     lower_Y: np.ndarray,
                     higher_X: np.ndarray,
@@ -146,5 +143,5 @@ def feedback_signal(higher_activity_map: np.ndarray,
 
     """
     f = interpolate.interp2d(higher_X, higher_Y, higher_activity_map)
-    sampled_data = f(lower_X, lower_Y)
-    return ndimage.correlate(sampled_data, kernel, mode='nearest')
+    return f(lower_X, lower_Y)
+

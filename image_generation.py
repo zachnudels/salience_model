@@ -17,7 +17,11 @@ def generate_block(input_dim: Tuple[int, int] = (121, 121),
     fig_x = int(figure_dim[1] / 2)
     fig_y = int(figure_dim[0] / 2)
 
-    image[mid_x - fig_x: mid_x + fig_x, mid_y - fig_y: mid_y + fig_y] = figure_orientation
+    if figure_dim[1] % 2 != 0 and figure_dim[0] % 2 != 0:
+        image[mid_x - fig_x: mid_x + fig_x + 1, mid_y - fig_y: mid_y + fig_y + 1] = figure_orientation
+    else:
+        image[mid_x - fig_x: mid_x + fig_x, mid_y - fig_y: mid_y + fig_y] = figure_orientation
+
     return image
 
 
