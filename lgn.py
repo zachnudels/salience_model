@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Tuple
+from typing import List, Tuple
 
 from utils import runge_kutta2_step
 
@@ -14,10 +14,11 @@ class LGN:
     W represents slower inhibitory cells
     """
 
-    def __init__(self, feature_pref: float, input_dim: Tuple[int, int]):
-        self.feature_pref = feature_pref
-        self.V = np.zeros(shape=input_dim, dtype=np.double)
-        self.W = np.zeros(shape=input_dim, dtype=np.double)
+    def __init__(self, feature_prefs: List[float], input_dim: Tuple[int, int]):
+        self.feature_prefs = feature_prefs
+        self.input_dim = (*input_dim, len(self.feature_prefs))
+        self.V = np.zeros(shape=self.input_dim, dtype=np.double)
+        self.W = np.zeros(shape=self.input_dim, dtype=np.double)
 
     def V_dot(self, V: np.ndarray, signal: np.ndarray) -> np.ndarray:
         """
@@ -25,9 +26,8 @@ class LGN:
         :param signal:
         :return:
         """
-        activity = np.ones_like(signal) * (signal == self.feature_pref)  # 1 if feature is preferred by this map
         inhibitory = -2 * self.W ** 2 * V
-        excitatory = -activity * (V - 10)
+        excitatory = -signal * (V - 10)
         v_dot = inhibitory + excitatory
         return v_dot
 
@@ -35,9 +35,9 @@ class LGN:
         """
         :return:
         """
-        inhibitory = - (1/5) * W
-        excitatory = - (1/5) * self.V * (W - 25)
-        return inhibitory + excitatory
+        inhibitory = - W
+        excitatory = - self.V * (W - 25)
+        return (1/5) * (inhibitory + excitatory)
 
     def update(self, _input: np.ndarray, timestep: float) -> None:
         """

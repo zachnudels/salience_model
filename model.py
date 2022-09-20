@@ -1,13 +1,15 @@
 import math
+
 import numpy as np
 import pandas as pd
 
-from typing import List, Tuple
+from copy import deepcopy
+from typing import Callable, Dict, List, Tuple, Union
 from scipy import interpolate, ndimage
 
 from lgn import LGN
 from fef import FEF
-from region import Region
+from layer import Layer
 
 
 class Model:
@@ -19,11 +21,16 @@ class Model:
 
     def __init__(self,
                  parameters: pd.DataFrame,
-                 features: List[int],
+                 features: Union[List[int], np.ndarray],
+                 tuning_curve: Callable,
                  input_dim: Tuple[int, int] = (121, 121),
-                 lSquare: int = 25):  # TODO: Change code so can set where cen, bck, etc. lies
-        # PARAMETERS
+                 input_activity: np.ndarray = None,
+                 recording_sites: Dict[str, Dict[str, Tuple[int, int]]] = None,
+                 initial_recordings: Dict[str, List[float]] = None,
+                 ):
 
+        # PARAMETERS
+        self.tuning_curve = tuning_curve
         ratioV1toV2 = 0.5
         ratioV2toV4 = 0.25
 
@@ -37,11 +44,12 @@ class Model:
         V4_dim = tuple(math.floor(V2_dim_i * ratioV2toV4) for V2_dim_i in V2_dim)
 
         # Construct the model nodes with one activity map for each feature (preference)
-        self.LGN = [LGN(feature, self.input_dim,) for feature in features]
-        self.V1 = [Region(parameters["V1"], V1_dim, lSquare, V1_dim, feature) for feature in features]
-        self.V2 = [Region(parameters["V2"], V2_dim, lSquare, V1_dim, feature) for feature in features]
-        self.V4 = [Region(parameters["V4"], V4_dim, lSquare, V1_dim, feature) for feature in features]
-        self.FEF = [FEF(parameters["FEF"], feature, V4_dim) for feature in features]
+        self.LGN = LGN(features, self.input_dim)
+        self.V1 = Layer(parameters["V1"], V1_dim, features, tuning_curve)
+        self.V2 = Layer(parameters["V2"], V2_dim, features, tuning_curve)
+        self.V4 = Layer(parameters["V4"], V4_dim, features, tuning_curve)
+
+        self.FEF = FEF(parameters["FEF"], features, V4_dim)
 
         # Instantiate spaces to reduce signal fidelity when feeding forward
         # This is required since a higher region is more coarsely grained, and so we sample the lower region
@@ -50,70 +58,92 @@ class Model:
         self.V2_X, self.V2_Y = np.linspace(-1, 1, V2_dim[1]), np.linspace(-1, 1, V2_dim[0])
         self.V4_X, self.V4_Y = np.linspace(-1, 1, V4_dim[1]), np.linspace(-1, 1, V4_dim[0])
 
-    def update(self, _input: np.ndarray, timestep: float):
-        for f in range(len(self.features)):
-            self.LGN[f].update(_input, timestep)
+        self.input_activity = np.zeros(shape=(V1_dim[0], V1_dim[1], len(self.features)))
+        # If the only one input is used in the simulation, process it now to save computation time
+        if input_activity is not None:
+            self.process_input(input_activity)
 
-            V1_neighbours = {self.V1[_f].feature_pref: self.V1[_f].V for _f in range(len(self.features)) if _f != f}
-            self.V1[f].update_S(V1_neighbours, timestep)
+        self.recording_sites = recording_sites
+        if initial_recordings is None:
+            initial_recordings = []
 
-            V2_neighbours = {self.V2[_f].feature_pref: self.V2[_f].V for _f in range(len(self.features)) if _f != f}
-            self.V2[f].update_S(V2_neighbours, timestep)
+        self.recordings = {layer: {site: deepcopy(initial_recordings) for site in recording_sites[layer]}
+                           for layer in recording_sites}
 
-            V4_neighbours = {self.V4[_f].feature_pref: self.V4[_f].V for _f in range(len(self.features)) if _f != f}
-            self.V4[f].update_S(V4_neighbours, timestep)
+    def process_input(self, activity):
+        for k in range(len(self.features)):
+            self.input_activity[:, :, k] = self.tuning_curve(activity, self.features[k])
 
-            V1_feedforward = self.LGN[f].V
-            self.V1[f].update(V1_feedforward, timestep)
+    def update(self, timestep: float, bu_input: np.ndarray = None, td_input: np.ndarray = None):
 
-            V2_feedforward = feedforward_signal(self.V1[f].V,
-                                                self.V2[f].ff_kernel,
-                                                self.V1_X,
-                                                self.V1_Y,
-                                                self.V2_X,
-                                                self.V2_Y)
-            self.V2[f].update(V2_feedforward, timestep)
+        if bu_input is not None:
+            self.process_input(bu_input)
 
-            V4_feedforward = feedforward_signal(self.V2[f].V,
-                                                self.V4[f].ff_kernel,
-                                                self.V2_X,
-                                                self.V2_Y,
-                                                self.V4_X,
-                                                self.V4_Y)
-            self.V4[f].update(V4_feedforward, timestep)
+        self.LGN.update(self.input_activity, timestep)
 
-            FEF_feedforward = self.V4[f].V
-            self.FEF[f].update(FEF_feedforward, timestep)
+        V1_feedforward = self.LGN.V
+        self.V1.update(V1_feedforward, timestep)
 
-            V1_2_feedback = feedback_interp(self.V2[f].W,
+        V2_feedforward = feedforward_signal(self.V1.V,
+                                            self.V2.ff_kernel,
                                             self.V1_X,
                                             self.V1_Y,
                                             self.V2_X,
                                             self.V2_Y)
-            V1_4_feedback = feedback_interp(self.V4[f].W,
-                                            self.V1_X,
-                                            self.V1_Y,
+        self.V2.update(V2_feedforward, timestep)
+
+        V4_feedforward = feedforward_signal(self.V2.V,
+                                            self.V4.ff_kernel,
+                                            self.V2_X,
+                                            self.V2_Y,
                                             self.V4_X,
                                             self.V4_Y)
-            V1_feedback = ndimage.correlate(V1_2_feedback + V1_4_feedback, self.V1[f].fb_kernel, mode='nearest')
-            self.V1[f].update_D(V1_feedback, timestep)
+        self.V4.update(V4_feedforward, timestep)
 
-            V2_feedback = feedback_interp(self.V4[f].W,
-                                          self.V2_X,
-                                          self.V2_Y,
-                                          self.V4_X,
-                                          self.V4_Y)
-            V2_feedback = ndimage.correlate(V2_feedback, self.V2[f].fb_kernel, mode='nearest')
-            self.V2[f].update_D(V2_feedback, timestep)
+        FEF_feedforward = self.V4.V
+        self.FEF.update(FEF_feedforward, timestep)
 
-    def __repr__(self):
-        return self.LGN.__repr__()
+        V1_2_feedback = feedback_interp(self.V2.W,
+                                        self.V1_X,
+                                        self.V1_Y,
+                                        self.V2_X,
+                                        self.V2_Y)
+        V1_4_feedback = feedback_interp(self.V4.W,
+                                        self.V1_X,
+                                        self.V1_Y,
+                                        self.V4_X,
+                                        self.V4_Y)
+        V1_feedback = np.zeros_like(self.V1.V)
+        for i in range(len(self.features)):
+            V1_feedback[:, :, i] = ndimage.correlate(V1_2_feedback[:, :, i] + V1_4_feedback[:, :, i],
+                                                     self.V1.fb_kernel,
+                                                     mode='nearest')
+        self.V1.update_D(V1_feedback, timestep)
 
-    def __str__(self):
-        rtn_string = f"Preprocessing Stage: \n"
-        for f in range(len(self.features)):
-            rtn_string += f"Feature {self.features[f]}: \n{self.LGN[f]}\n"
-        return rtn_string
+        _V2_feedback = feedback_interp(self.V4.W,
+                                       self.V2_X,
+                                       self.V2_Y,
+                                       self.V4_X,
+                                       self.V4_Y)
+        V2_feedback = np.zeros_like(self.V2.W)
+        for i in range(len(self.features)):
+            V2_feedback[:, :, i] = ndimage.correlate(_V2_feedback[:, :, i],
+                                                     self.V2.fb_kernel,
+                                                     mode='nearest')
+        self.V2.update_D(V2_feedback, timestep)
+
+        if td_input is not None:
+            self.V4.update(td_input, timestep)
+
+        for layer in self.recording_sites:
+            mean_activity = np.mean(getattr(self, layer).V, axis=2)
+            for site in self.recording_sites[layer]:
+                self.recordings[layer][site].append(mean_activity[self.recording_sites[layer][site]])
+
+    def simulate(self, n=600, timestep=10e-3):
+        for i in range(n):
+            self.update(timestep)
+        return self.recordings
 
 
 def feedforward_signal(lower_activity_map: np.ndarray,
@@ -127,9 +157,12 @@ def feedforward_signal(lower_activity_map: np.ndarray,
     be fed forward to the subsequent region
 
     """
-    activity = ndimage.correlate(lower_activity_map, kernel, mode='nearest')
-    f = interpolate.interp2d(lower_X, lower_Y, activity)
-    return f(higher_X, higher_Y)
+    higher_activity = np.zeros((higher_X.shape[0], higher_Y.shape[0], lower_activity_map.shape[2]))
+    for i in range(lower_activity_map.shape[2]):
+        activity = ndimage.correlate(lower_activity_map[:, :, i], kernel, mode='nearest')
+        f = interpolate.interp2d(lower_X, lower_Y, activity)
+        higher_activity[:, :, i] = f(higher_X, higher_Y)
+    return higher_activity
 
 
 def feedback_interp(higher_activity_map: np.ndarray,
@@ -142,6 +175,8 @@ def feedback_interp(higher_activity_map: np.ndarray,
     repeating the activity across both axes in the ratio of the two regions' dimensions
 
     """
-    f = interpolate.interp2d(higher_X, higher_Y, higher_activity_map)
-    return f(lower_X, lower_Y)
-
+    lower_activity = np.zeros((lower_X.shape[0], lower_Y.shape[0], higher_activity_map.shape[2]))
+    for i in range(higher_activity_map.shape[2]):
+        f = interpolate.interp2d(higher_X, higher_Y, higher_activity_map[:, :, i])
+        lower_activity[:, :, i] = f(lower_X, lower_Y)
+    return lower_activity

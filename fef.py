@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from utils import runge_kutta2_step, gaussian_kernel
-from typing import Tuple
+from typing import List, Tuple
 from scipy import ndimage
 
 
@@ -15,17 +15,19 @@ class FEF:
     W represents slower inhibitory cells
     """
 
-    def __init__(self, parameters: pd.Series, feature_pref: float, input_dim: Tuple[int, int]):
-        self.feature_pref = feature_pref
-        self.input_dim = input_dim
-        self.V = np.zeros(shape=input_dim, dtype=np.double)
+    def __init__(self, parameters: pd.Series, feature_prefs: List[float], input_dim: Tuple[int, int]):
+        self.feature_prefs = feature_prefs
+        self.input_dim = (*input_dim, len(self.feature_prefs))
+        self.V = np.zeros(shape=self.input_dim, dtype=np.double)
         self.leak_parameter = parameters["g1"]
         self.saturation = parameters["e1"]
         self.noise_sigma = parameters["noise_sigma"]
         self.beta = parameters["beta"]
         self.time_delay = 1 / parameters["c1"]
-        self.kernel = gaussian_kernel(int(parameters["plus_supp"]), int(parameters["sigma_plus"]))
-        self.kernel[self.kernel.shape[0] // 2, self.kernel.shape[1] // 2] = 0
+
+        self.kernel = np.zeros((int(parameters["plus_supp"]), int(parameters["plus_supp"]), 1))
+        self.kernel[:, :, 0] = gaussian_kernel(int(parameters["plus_supp"]),
+                                               parameters["sigma_plus"])
 
     def V_dot(self, V: np.ndarray, feedforward_signal: np.ndarray) -> np.ndarray:
         """
