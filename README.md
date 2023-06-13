@@ -60,8 +60,8 @@ Anaconda works with ************environments.************ These will contain all
 ### Step 1: Create a new environment and activate it
 
 ```jsx
-conda create --name figure_ground_segmentation python=3.9
-conda activate figure_ground_segmentation
+conda create --name salience_model python=3.9
+conda activate salience_model
 ```
 
 ### Step 2: Pull the model to your machine
@@ -69,8 +69,6 @@ conda activate figure_ground_segmentation
 Since we installed git in conda, we can use it to pull (download) the code repository (repo) to your machine. Note however, that within conda, you are still working within your normal file directory. Everything you do within the Anaconda prompt will happen on your machine. The only difference is that when you run code, your machine will run it with the dependencies specified by Anaconda. So don’t get confused with environments and directories, they are separate.
 
 Change to a directory on your machine in which you want the model repo to be stored in and then pull the repo
-
-Change directory to the root of this repo
 
 ```jsx
 cd <your_desired_directory_path>
@@ -82,7 +80,7 @@ git clone https://github.com/zachnudels/salience_model
 The repo has a file specifying the dependencies it uses. We can use that to automatically install all of these using pip. But first we must change directory to the model repo
 
 ```jsx
-cd figure_ground_segmentation
+cd salience_model
 pip install -r requirements.txt
 ```
 
