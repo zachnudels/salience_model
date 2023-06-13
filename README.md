@@ -161,7 +161,7 @@ plt.legend()
 
 To produce something like
 
-![Poort Replication](Poort replication.png)
+![Poort Replication](https://github.com/zachnudels/salience_model/blob/main/Poort%20replication.png)
 
 ## Two Figure Example
 
