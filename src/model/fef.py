@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from ..utilities import runge_kutta2_step, gaussian_kernel
+from src.utilities import runge_kutta2_step, gaussian_kernel
 from typing import List, Tuple
 from scipy import ndimage
 
@@ -15,7 +15,12 @@ class FEF:
     W represents slower inhibitory cells
     """
 
-    def __init__(self, parameters: pd.Series, feature_prefs: List[float], input_dim: Tuple[int, int]):
+    def __init__(
+        self,
+        parameters: pd.Series,
+        feature_prefs: List[float],
+        input_dim: Tuple[int, int],
+    ):
         self.feature_prefs = feature_prefs
         self.input_dim = (*input_dim, len(self.feature_prefs))
         self.V = np.zeros(shape=self.input_dim, dtype=np.double)
@@ -25,9 +30,12 @@ class FEF:
         self.beta = parameters["beta"]
         self.time_delay = 1 / parameters["c1"]
 
-        self.kernel = np.zeros((int(parameters["plus_supp"]), int(parameters["plus_supp"]), 1))
-        self.kernel[:, :, 0] = gaussian_kernel(int(parameters["plus_supp"]),
-                                               parameters["sigma_plus"])
+        self.kernel = np.zeros(
+            (int(parameters["plus_supp"]), int(parameters["plus_supp"]), 1)
+        )
+        self.kernel[:, :, 0] = gaussian_kernel(
+            int(parameters["plus_supp"]), parameters["sigma_plus"]
+        )
 
     def V_dot(self, V: np.ndarray, feedforward_signal: np.ndarray) -> np.ndarray:
         """
@@ -36,8 +44,10 @@ class FEF:
         :return:
         """
 
-        leak_conductance = - self.leak_parameter * V
-        lateral_inhibition = - self.beta * ndimage.convolve(V, self.kernel, mode='nearest')
+        leak_conductance = -self.leak_parameter * V
+        lateral_inhibition = -self.beta * ndimage.convolve(
+            V, self.kernel, mode="nearest"
+        )
         excitatory = feedforward_signal
         driving = leak_conductance + lateral_inhibition + excitatory
 

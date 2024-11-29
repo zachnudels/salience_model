@@ -3,7 +3,7 @@ import pandas as pd
 
 from scipy import ndimage
 from typing import Callable, List, Tuple
-from ..utilities import gaussian_kernel, runge_kutta2_step
+from src.utilities import gaussian_kernel, runge_kutta2_step
 
 
 class Layer:
@@ -13,11 +13,13 @@ class Layer:
     in higher and lower regions
     """
 
-    def __init__(self,
-                 parameters: pd.Series,
-                 input_dim: Tuple[int, int],
-                 feature_prefs: List[float],
-                 tuning_curve: Callable):
+    def __init__(
+        self,
+        parameters: pd.Series,
+        input_dim: Tuple[int, int],
+        feature_prefs: List[float],
+        tuning_curve: Callable,
+    ):
 
         self.tuning_curve = tuning_curve
         self.feature_prefs = feature_prefs
@@ -25,7 +27,9 @@ class Layer:
 
         # CELLS
         self.V = np.zeros(shape=self.input_dim, dtype=np.double)  # Input cell
-        self.D = np.zeros(shape=self.input_dim, dtype=np.double)  # Feedback cell (region filling)
+        self.D = np.zeros(
+            shape=self.input_dim, dtype=np.double
+        )  # Feedback cell (region filling)
         self.U = np.zeros(shape=self.input_dim, dtype=np.double)  # Inhibitory cell
         self.W = np.zeros(shape=self.input_dim, dtype=np.double)  # Edge detection cell
         self.S = np.zeros(shape=self.input_dim, dtype=np.double)  # Similarity cell
@@ -55,16 +59,26 @@ class Layer:
         self.g9 = parameters["g9"]  # S similarity modulation
 
         # KERNELS
-        self.ff_kernel = gaussian_kernel(int(parameters["ff_support"]), parameters["sigma_ff"])
-        self.fb_kernel = gaussian_kernel(int(parameters["fb_support"]), parameters["sigma_fb"])
+        self.ff_kernel = gaussian_kernel(
+            int(parameters["ff_support"]), parameters["sigma_ff"]
+        )
+        self.fb_kernel = gaussian_kernel(
+            int(parameters["fb_support"]), parameters["sigma_fb"]
+        )
 
-        self.plus_kernel = np.zeros((int(parameters["plus_supp"]), int(parameters["plus_supp"]), 1))
-        self.plus_kernel[:, :, 0] = gaussian_kernel(int(parameters["plus_supp"]),
-                                                    parameters["sigma_plus"])
+        self.plus_kernel = np.zeros(
+            (int(parameters["plus_supp"]), int(parameters["plus_supp"]), 1)
+        )
+        self.plus_kernel[:, :, 0] = gaussian_kernel(
+            int(parameters["plus_supp"]), parameters["sigma_plus"]
+        )
 
-        self.minus_kernel = np.zeros((int(parameters["minus_supp"]), int(parameters["minus_supp"]), 1))
-        self.minus_kernel[:, :, 0] = gaussian_kernel(int(parameters["minus_supp"]),
-                                                     parameters["sigma_minus"])
+        self.minus_kernel = np.zeros(
+            (int(parameters["minus_supp"]), int(parameters["minus_supp"]), 1)
+        )
+        self.minus_kernel[:, :, 0] = gaussian_kernel(
+            int(parameters["minus_supp"]), parameters["sigma_minus"]
+        )
 
     def V_dot(self, V: np.ndarray, feedforward_signal: np.ndarray) -> np.ndarray:
         """
@@ -73,7 +87,7 @@ class Layer:
         :param feedforward_signal:
         :return:
         """
-        leak_conductance = - self.g1 * self.U
+        leak_conductance = -self.g1 * self.U
 
         if not pd.isna(self.k2):
             leak_conductance -= self.k2 * self.S
@@ -85,21 +99,27 @@ class Layer:
         if not pd.isna(self.k1):
             feedback_modulation += self.k1 * self.D
 
-        driving_input = - self.a * feedforward_signal * feedback_modulation * (V - self.e1)
-        boundary_detection = - self.g2 * self.W * (V - self.e2)
+        driving_input = (
+            -self.a * feedforward_signal * feedback_modulation * (V - self.e1)
+        )
+        boundary_detection = -self.g2 * self.W * (V - self.e2)
 
         V_dot = leak_conductance + driving_input + boundary_detection
 
         return self.c1 * V_dot
 
     def W_dot(self, W, _input):
-        inhibitory = - self.g3 * W
+        inhibitory = -self.g3 * W
         if not pd.isna(self.k1):
             inhibitory *= self.D
 
-        V = - self.g4 * np.abs(_input - ndimage.correlate(
-            _input, self.minus_kernel, mode='nearest'
-        )) * (W - self.e3)
+        V = (
+            -self.g4
+            * np.abs(
+                _input - ndimage.correlate(_input, self.minus_kernel, mode="nearest")
+            )
+            * (W - self.e3)
+        )
 
         return (1 / self.c2) * (V + inhibitory)
 
@@ -107,8 +127,8 @@ class Layer:
         """
         :return:
         """
-        leak_conductance = - self.g5 * U
-        excitatory = - self.g6 * self.V * (U - self.e4)
+        leak_conductance = -self.g5 * U
+        excitatory = -self.g6 * self.V * (U - self.e4)
 
         U_dot = leak_conductance + excitatory
         return (1 / self.c3) * U_dot
@@ -118,9 +138,14 @@ class Layer:
         for k1 in range(len(self.feature_prefs)):
             for k2 in range(len(self.feature_prefs)):
                 if k1 != k2:
-                    excitatory[:, :, k1] += \
-                        self.g9 * self.tuning_curve(self.feature_prefs[k1], self.feature_prefs[k2]) *\
-                        _input[:, :, k2] * _input[:, :, k1]
+                    excitatory[:, :, k1] += (
+                        self.g9
+                        * self.tuning_curve(
+                            self.feature_prefs[k1], self.feature_prefs[k2]
+                        )
+                        * _input[:, :, k2]
+                        * _input[:, :, k1]
+                    )
         excitatory = -self.g8 * excitatory * (self.S - self.e6)
         return excitatory
 
@@ -130,16 +155,13 @@ class Layer:
         :param feedback_signal:
         :return:
         """
-        leak_conductance = - self.g7 * D
-        feedback_effect = - feedback_signal * (D - self.e5)
+        leak_conductance = -self.g7 * D
+        feedback_effect = -feedback_signal * (D - self.e5)
 
         return (1 / self.c4) * (leak_conductance + feedback_effect)
 
-    def update(self,
-               feedforward_signal: np.ndarray,
-               timestep: float) -> None:
-        """
-        """
+    def update(self, feedforward_signal: np.ndarray, timestep: float) -> None:
+        """ """
         if not pd.isna(self.k2):
             self.S = runge_kutta2_step(self.S_dot, self.V, timestep, self.S)
         self.V = runge_kutta2_step(self.V_dot, feedforward_signal, timestep, self.V)
@@ -148,7 +170,9 @@ class Layer:
         self.W = runge_kutta2_step(self.W_dot, self.V, timestep, self.W)
 
     def update_D(self, feedback_signal: np.ndarray, timestep: float) -> None:
-        if not pd.isna(self.g2):  # V4 cell - for efficiency don't compute since will be 0
+        if not pd.isna(
+            self.g2
+        ):  # V4 cell - for efficiency don't compute since will be 0
             self.D = runge_kutta2_step(self.D_dot, feedback_signal, timestep, self.D)
 
 

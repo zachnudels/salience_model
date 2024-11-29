@@ -9,14 +9,15 @@ from .model import Model
 
 
 class OrientationModel(Model):
-    def __init__(self,
-                 parameters: pd.DataFrame,
-                 channels: int,
-                 input_dim: Tuple[int, int],
-                 input_activity: np.ndarray = None,
-                 recording_sites: Dict[str, Dict[str, Tuple[int, int]]] = None,
-                 initial_recordings: Dict[str, List[float]] = None,
-                 ):
+    def __init__(
+        self,
+        parameters: pd.DataFrame,
+        channels: int,
+        input_dim: Tuple[int, int],
+        input_activity: np.ndarray = None,
+        recording_sites: Dict[str, Dict[str, Tuple[int, int]]] = None,
+        initial_recordings: Dict[str, List[float]] = None,
+    ):
         """
         A salience_model simulating cortical activity in the human visual system
 
@@ -29,16 +30,20 @@ class OrientationModel(Model):
                                    our recording arrays
         """
         features = np.arange(0, 180, 180 / channels)
-        super().__init__(parameters,
-                         features,
-                         tuning_function(len(features)),
-                         input_dim,
-                         input_activity,
-                         recording_sites,
-                         initial_recordings)
+        super().__init__(
+            parameters,
+            features,
+            tuning_function(len(features)),
+            input_dim,
+            input_activity,
+            recording_sites,
+            initial_recordings,
+        )
 
 
-def tuning_function(channels: int) -> Callable[[Union[List, float], float], Union[List, float]]:
+def tuning_function(
+    channels: int,
+) -> Callable[[Union[List, float], float], Union[List, float]]:
     """
     Given a number of channels, this function returns a tuning function used by the orientation salience_model.
     It finds parameters to use with the Von Mises distribution. We desire that the normalized sum of each tuning curve
@@ -92,4 +97,3 @@ def tuning_curve(signal, preference, kappa, norm=1):
     :return:
     """
     return vonmises.pdf(to_rad(signal), kappa, to_rad(preference), 0.5) / norm
-

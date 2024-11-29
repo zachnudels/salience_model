@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Tuple
 
-from ..utilities import runge_kutta2_step
+from src.utilities import runge_kutta2_step
 
 
 class LGN:
@@ -26,7 +26,7 @@ class LGN:
         :param signal:
         :return:
         """
-        inhibitory = -2 * self.W ** 2 * V
+        inhibitory = -2 * self.W**2 * V
         excitatory = -signal * (V - 10)
         v_dot = inhibitory + excitatory
         return v_dot
@@ -35,9 +35,9 @@ class LGN:
         """
         :return:
         """
-        inhibitory = - W
-        excitatory = - self.V * (W - 25)
-        return (1/5) * (inhibitory + excitatory)
+        inhibitory = -W
+        excitatory = -self.V * (W - 25)
+        return (1 / 5) * (inhibitory + excitatory)
 
     def update(self, _input: np.ndarray, timestep: float) -> None:
         """
